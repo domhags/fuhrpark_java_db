@@ -1,4 +1,4 @@
-import Datenbank.*;
+import Datenbank.DatenbankVerbindung;
 import Mitarbeiter.Mitarbeiter;
 import Fahrzeug.*;
 
@@ -43,30 +43,34 @@ public class Main {
                 System.out.println("1. Fahrzeug hinzufügen");
                 System.out.println("2. Mitarbeiter hinzufügen");
                 System.out.println("3. Alle Fahrzeuge anzeigen");
-                System.out.println("4. Beenden");
-                System.out.print("Wählen Sie eine Option (1-4): ");
+                System.out.println("4. Alle Mitarbeiter anzeigen");
+                System.out.println("5. Beenden");
+                System.out.print("Wählen Sie eine Option (1-5): ");
 
                 try {
                     auswahl = Integer.parseInt(scanner.nextLine());
-                    if (auswahl < 1 || auswahl > 4) {
+                    if (auswahl < 1 || auswahl > 5) {
                         throw new NumberFormatException();
                     }
                 } catch (NumberFormatException e) {
-                    System.out.print("Ungültige Eingabe. Bitte wählen Sie eine Option (1-3): ");
+                    System.out.print("Ungültige Eingabe. Bitte wählen Sie eine Option (1-6): ");
                     continue;
                 }
 
                 switch (auswahl) {
                     case 1:
-                        fahrzeugHinzufuegen(scanner, stmt);
+                        fahrzeugHinzufuegen(scanner, connection);
                         break;
                     case 2:
-                        mitarbeiterHinzufuegen(scanner, stmt.getConnection());
+                        mitarbeiterHinzufuegen(scanner, connection);
                         break;
                     case 3:
                         zeigeFahrzeuge(stmt);
                         break;
                     case 4:
+                        zeigeMitarbeiter(stmt);
+                        break;
+                    case 5:
                         System.out.println("Programm wird beendet.");
                         return;
                 }
@@ -76,64 +80,141 @@ public class Main {
         }
     }
 
-    private static void fahrzeugHinzufuegen(Scanner scanner, Statement stmt) throws SQLException {
+    private static void fahrzeugHinzufuegen(Scanner scanner, Connection connection) {
         Fahrzeug fahrzeug = getFahrzeug(scanner);
         if (fahrzeug != null) {
-            String insertSQL = fahrzeug.getInsertSQLBefehl();
-            stmt.executeUpdate(insertSQL, Statement.RETURN_GENERATED_KEYS);
-            ResultSet generatedKeys = stmt.getGeneratedKeys();
-            if (generatedKeys.next()) {
-                int id = generatedKeys.getInt(1);
-                String specificSQL = fahrzeug.getSpezifischenInsertSQLBefehl(id);
-                stmt.executeUpdate(specificSQL);
-                System.out.println("Fahrzeug erfolgreich hinzugefügt!");
+            String insertSQL = "";
+
+            if (fahrzeug instanceof Fahrrad) {
+                insertSQL = "INSERT INTO Fahrrad (kilometerstand, baujahr, farbe, art, anzahl_gaenge) " +
+                        "VALUES (?, ?, ?, ?, ?)";
+            } else if (fahrzeug instanceof Motorrad) {
+                insertSQL = "INSERT INTO Motorrad (kilometerstand, baujahr, farbe, hubraum, anzahl_helmhalterungen) " +
+                        "VALUES (?, ?, ?, ?, ?)";
+            } else if (fahrzeug instanceof PKW) {
+                insertSQL = "INSERT INTO PKW (kilometerstand, baujahr, farbe, anzahl_sitze, kofferraumvolumen) " +
+                        "VALUES (?, ?, ?, ?, ?)";
+            } else if (fahrzeug instanceof LKW) {
+                insertSQL = "INSERT INTO LKW (kilometerstand, baujahr, farbe, ladegewicht, anzahl_achsen) " +
+                        "VALUES (?, ?, ?, ?, ?)";
+            }
+
+            try (PreparedStatement pstmt = connection.prepareStatement(insertSQL, Statement.RETURN_GENERATED_KEYS)) {
+                pstmt.setInt(1, fahrzeug.getKilometerstand());
+                pstmt.setInt(2, fahrzeug.getBaujahr());
+                pstmt.setString(3, fahrzeug.getFarbe());
+
+                // Setze die spezifischen Attribute des Fahrzeugs, je nach Typ
+                if (fahrzeug instanceof Fahrrad) {
+                    Fahrrad f = (Fahrrad) fahrzeug;
+                    pstmt.setString(4, f.getArt());
+                    pstmt.setInt(5, f.getAnzahlGaenge());
+                } else if (fahrzeug instanceof Motorrad) {
+                    Motorrad m = (Motorrad) fahrzeug;
+                    pstmt.setInt(4, m.getHubraum());
+                    pstmt.setInt(5, m.getAnzahlHelmhalterungen());
+                } else if (fahrzeug instanceof PKW) {
+                    PKW p = (PKW) fahrzeug;
+                    pstmt.setInt(4, p.getSitze());
+                    pstmt.setInt(5, p.getKofferraumvolumen());
+                } else if (fahrzeug instanceof LKW) {
+                    LKW l = (LKW) fahrzeug;
+                    pstmt.setFloat(4, l.getLadegewicht());
+                    pstmt.setInt(5, l.getAnzahlAchsen());
+                }
+
+                pstmt.executeUpdate();
+                ResultSet generatedKeys = pstmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    int id = generatedKeys.getInt(1);
+                    System.out.println("Fahrzeug erfolgreich hinzugefügt mit ID: " + id);
+                }
+            } catch (SQLException e) {
+                logger.log(Level.SEVERE, "Fehler beim Hinzufügen des Fahrzeugs", e);
             }
         }
     }
 
     private static void zeigeFahrzeuge(Statement stmt) throws SQLException {
-        String query = "SELECT Fahrzeug.fahrzeug_id, Fahrzeug.kilometerstand, Fahrzeug.baujahr, Fahrzeug.farbe, " +
-                "Fahrrad.art, Fahrrad.anzahl_gaenge, Motorrad.hubraum, Motorrad.anzahl_helmhalterungen, PKW.anzahl_sitze, " +
-                "PKW.kofferraumvolumen, LKW.ladegewicht, LKW.anzahl_achsen " +
-                "FROM Fahrzeug " +
-                "LEFT JOIN Fahrrad ON Fahrzeug.fahrzeug_id = Fahrrad.id " +
-                "LEFT JOIN Motorrad ON Fahrzeug.fahrzeug_id = Motorrad.id " +
-                "LEFT JOIN PKW ON Fahrzeug.fahrzeug_id = PKW.id " +
-                "LEFT JOIN LKW ON Fahrzeug.fahrzeug_id = LKW.id";
+        System.out.println("--- Alle Fahrzeuge ---");
+
+        zeigeFahrzeugeAusTabelle(stmt, "Fahrrad");
+        zeigeFahrzeugeAusTabelle(stmt, "Motorrad");
+        zeigeFahrzeugeAusTabelle(stmt, "PKW");
+        zeigeFahrzeugeAusTabelle(stmt, "LKW");
+    }
+
+
+    private static void zeigeFahrzeugeAusTabelle(Statement stmt, String tableName) throws SQLException {
+        String query = "SELECT * FROM " + tableName;
         ResultSet rs = stmt.executeQuery(query);
 
-        // Extrahieren und Anzeigen der Daten
+        // Wenn keine Fahrzeuge in der Tabelle sind, eine Nachricht anzeigen
+        if (!rs.isBeforeFirst()) {
+            System.out.println("Keine Fahrzeuge in der Tabelle " + tableName);
+            return;
+        }
+
         while (rs.next()) {
-            int id = rs.getInt("fahrzeug_id");
-            int fahrzeugKilometerstand = rs.getInt("kilometerstand");
-            int fahrzeugBaujahr = rs.getInt("baujahr");
-            String fahrzeugFarbe = rs.getString("farbe");
+            int id = rs.getInt(tableName.toLowerCase() + "_id");
+            int kilometerstand = rs.getInt("kilometerstand");
+            int baujahr = rs.getInt("baujahr");
+            String farbe = rs.getString("farbe");
 
-            System.out.println("ID: " + id + ", Kilometerstand: " + fahrzeugKilometerstand + ", Baujahr: " + fahrzeugBaujahr +
-                    ", Farbe: " + fahrzeugFarbe);
+            System.out.println("ID: " + id + ", Kilometerstand: " + kilometerstand +
+                    ", Baujahr: " + baujahr + ", Farbe: " + farbe);
 
-            // Überprüfen des Fahrzeugtyps und Anzeigen von Details
-            if (rs.getString("art") != null) {
-                System.out.println("Typ: Fahrrad, Art: " + rs.getString("art"));
-            } else if (rs.getInt("anzahl_gaenge") > 0) {
-                System.out.println("Typ: Fahrrad, Anzahl Gänge: " + rs.getInt("anzahl_gaenge"));
-            } else if (rs.getInt("hubraum") > 0) {
-                System.out.println("Typ: Motorrad, Hubraum: " + rs.getInt("hubraum") + " ccm");
-            } else if (rs.getInt("anzahl_helmhalterungen") > 0) {
-                System.out.println("Typ: Motorrad, Anzahl Helmhalterungen: " + rs.getInt("anzahl_helmhalterungen"));
-            } else if (rs.getInt("anzahl_sitze") > 0) {
-                System.out.println("Typ: PKW, Anzahl der Sitze: " + rs.getInt("anzahl_sitze"));
-            } else if (rs.getInt("kofferraumvolumen") > 0) {
-                System.out.println("Typ: PKW, Kofferraumvolumen: " + rs.getInt("kofferraumvolumen"));
-            } else if (rs.getFloat("ladegewicht") > 0) {
-                System.out.println("Typ: LKW, Ladegewicht: " + rs.getFloat("ladegewicht") + " kg");
-            } else if (rs.getInt("anzahl_achsen") > 0) {
-                System.out.println("Typ: LKW, Anzahl der Achsen: " + rs.getInt("anzahl_achsen"));
+            // Zeige spezifische Details für jeden Fahrzeugtyp
+            switch (tableName) {
+                case "Fahrrad":
+                    zeigeFahrradDetails(rs);
+                    System.out.println("Typ: Fahrrad");
+                    break;
+                case "Motorrad":
+                    zeigeMotorradDetails(rs);
+                    System.out.println("Typ: Motorrad");
+                    break;
+                case "PKW":
+                    zeigePKWDetails(rs);
+                    System.out.println("Typ: PKW");
+                    break;
+                case "LKW":
+                    zeigeLKWDetails(rs);
+                    System.out.println("Typ: LKW");
+                    break;
             }
+
             System.out.println("-----------------------------");
         }
     }
 
+    private static void zeigeFahrradDetails(ResultSet rs) throws SQLException {
+        String art = rs.getString("art");
+        int anzahlGaenge = rs.getInt("anzahl_gaenge");
+        System.out.println("Art: " + art);
+        System.out.println("Anzahl Gänge: " + anzahlGaenge);
+    }
+
+    private static void zeigeMotorradDetails(ResultSet rs) throws SQLException {
+        int hubraum = rs.getInt("hubraum");
+        int anzahlHelmhalterungen = rs.getInt("anzahl_helmhalterungen");
+        System.out.println("Hubraum: " + hubraum + " ccm");
+        System.out.println("Anzahl Helmhalterungen: " + anzahlHelmhalterungen);
+    }
+
+    private static void zeigePKWDetails(ResultSet rs) throws SQLException {
+        int anzahlSitze = rs.getInt("anzahl_sitze");
+        int kofferraumvolumen = rs.getInt("kofferraumvolumen");
+        System.out.println("Anzahl der Sitze: " + anzahlSitze);
+        System.out.println("Kofferraumvolumen: " + kofferraumvolumen + " Liter");
+    }
+
+    private static void zeigeLKWDetails(ResultSet rs) throws SQLException {
+        float ladegewicht = rs.getFloat("ladegewicht");
+        int anzahlAchsen = rs.getInt("anzahl_achsen");
+        System.out.println("Ladegewicht: " + ladegewicht + " kg");
+        System.out.println("Anzahl der Achsen: " + anzahlAchsen);
+    }
 
     private static void mitarbeiterHinzufuegen(Scanner scanner, Connection connection) {
         try {
@@ -145,121 +226,142 @@ public class Main {
                 pstmt.setDate(3, java.sql.Date.valueOf(mitarbeiter.getGeburtsdatum()));
 
                 pstmt.executeUpdate();
-                logger.info("Mitarbeiter erfolgreich hinzugefügt: " + mitarbeiter.getVorname() + " " + mitarbeiter.getNachname());
+                logger.info("Mitarbeiter erfolgreich hinzugefügt.");
             }
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Fehler beim Hinzufügen des Mitarbeiters", e);
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Unerwarteter Fehler", e);
         }
-    }
-
-    private static Mitarbeiter getMitarbeiter(Scanner scanner) {
-        System.out.print("Vorname des Mitarbeiters: ");
-        String vorname = scanner.nextLine();
-        System.out.print("Nachname des Mitarbeiters: ");
-        String nachname = scanner.nextLine();
-        System.out.print("Geburtsdatum des Mitarbeiters (YYYY-MM-DD): ");
-        LocalDate geburtsdatum;
-
-        while (true) {
-            try {
-                geburtsdatum = LocalDate.parse(scanner.nextLine());
-                break;
-            } catch (Exception e) {
-                System.out.print("Ungültiges Datum. Bitte geben Sie das Geburtsdatum im Format YYYY-MM-DD ein: ");
-            }
-        }
-        return new Mitarbeiter(vorname, nachname, geburtsdatum);
     }
 
     private static Fahrzeug getFahrzeug(Scanner scanner) {
-        System.out.println("Fahrzeugtypen: ");
+        System.out.println("Wählen Sie den Fahrzeugtyp:");
         System.out.println("1. Fahrrad");
         System.out.println("2. Motorrad");
         System.out.println("3. PKW");
         System.out.println("4. LKW");
-        System.out.print("Wählen Sie einen Typ: ");
-        int typ;
+        System.out.print("Option wählen (1-4): ");
 
-        while (true) {
-            try {
-                typ = Integer.parseInt(scanner.nextLine());
-                if (typ < 1 || typ > 4) {
-                    System.out.println("Ungültiger Typ. Bitte wählen Sie einen Typ (1-4): ");
-                    continue;
-                }
-                break;
-            } catch (NumberFormatException e) {
-                System.out.print("Ungültige Eingabe. Bitte wählen Sie einen Typ (1-4): ");
-            }
+        int typ;
+        try {
+            typ = Integer.parseInt(scanner.nextLine());
+        } catch (NumberFormatException e) {
+            System.out.println("Ungültige Eingabe. Bitte geben Sie eine Zahl zwischen 1 und 4 ein.");
+            return null;
         }
 
-        System.out.print("Kilometerstand des Fahrzeugs: ");
-        int kilometerstand = getInteger(scanner);
-        System.out.print("Baujahr des Fahrzeugs: ");
-        int baujahr = getInteger(scanner);
-        System.out.print("Farbe des Fahrzeugs: ");
-        String farbe = scanner.nextLine().trim();
-
+        Fahrzeug fahrzeug;
         switch (typ) {
             case 1:
-                return erstelleFahrrad(scanner, kilometerstand, baujahr, farbe);
+                fahrzeug = erstelleFahrrad(scanner);
+                break;
             case 2:
-                return erstelleMotorrad(scanner, kilometerstand, baujahr, farbe);
+                fahrzeug = erstelleMotorrad(scanner);
+                break;
             case 3:
-                return erstellePkw(scanner, kilometerstand, baujahr, farbe);
+                fahrzeug = erstellePKW(scanner);
+                break;
             case 4:
-                return erstelleLkw(scanner, kilometerstand, baujahr, farbe);
+                fahrzeug = erstelleLKW(scanner);
+                break;
             default:
-                throw new IllegalArgumentException("Ungültiger Fahrzeugtyp.");
+                System.out.println("Ungültige Eingabe. Bitte wählen Sie einen gültigen Fahrzeugtyp.");
+                return null;
         }
+        return fahrzeug;
     }
 
-    private static int getInteger(Scanner scanner) {
-        int value;
-        while (true) {
-            try {
-                value = Integer.parseInt(scanner.nextLine());
-                if (value < 0) {
-                    throw new NumberFormatException();
-                }
-                return value;
-            } catch (NumberFormatException e) {
-                System.out.print("Bitte geben Sie eine positive Zahl ein: ");
-            }
-        }
-    }
+    private static Fahrrad erstelleFahrrad(Scanner scanner) {
+        System.out.print("Geben Sie den Kilometerstand ein: ");
+        int kilometerstand = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie das Baujahr ein: ");
+        int baujahr = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie die Farbe ein: ");
+        String farbe = scanner.nextLine();
+        System.out.print("Geben Sie die Art des Fahrrads ein (Mountainbike, E-Bike): ");
+        String art = scanner.nextLine();
+        System.out.print("Geben Sie die Anzahl der Gänge ein: ");
+        int anzahlGaenge = Integer.parseInt(scanner.nextLine());
 
-    private static Fahrrad erstelleFahrrad(Scanner scanner, int kilometerstand, int baujahr, String farbe) {
-        System.out.print("Geben Sie den Typ des Fahrrads ein (zB E-Bike): ");
-        String art = scanner.nextLine().trim();
-        System.out.print("Geben Sie die Anzahl der Gänge vom Fahrrad ein: ");
-        int anzahlGaenge = Integer.parseInt(scanner.nextLine().trim());
         return new Fahrrad(kilometerstand, baujahr, farbe, art, anzahlGaenge);
     }
 
-    private static Motorrad erstelleMotorrad(Scanner scanner, int kilometerstand, int baujahr, String farbe) {
-        System.out.print("Hubraum des Motorrads: ");
-        int hubraum = Integer.parseInt(scanner.nextLine().trim());
-        System.out.print("Geben Sie die Anzahl der Helmhalterungen für das Motorrad ein: ");
-        int anzahlHelmhalterungen = Integer.parseInt(scanner.nextLine().trim());
+
+    private static Motorrad erstelleMotorrad(Scanner scanner) {
+        System.out.print("Geben Sie den Kilometerstand ein: ");
+        int kilometerstand = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie das Baujahr ein: ");
+        int baujahr = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie die Farbe ein: ");
+        String farbe = scanner.nextLine();
+        System.out.print("Geben Sie den Hubraum ein: ");
+        int hubraum = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie die Anzahl der Helmhalterungen ein: ");
+        int anzahlHelmhalterungen = Integer.parseInt(scanner.nextLine());
+
         return new Motorrad(kilometerstand, baujahr, farbe, hubraum, anzahlHelmhalterungen);
     }
 
-    private static PKW erstellePkw(Scanner scanner, int kilometerstand, int baujahr, String farbe) {
-        System.out.print("Anzahl der Sitze im PKW: ");
-        int anzahlSitze = Integer.parseInt(scanner.nextLine().trim());
+    private static PKW erstellePKW(Scanner scanner) {
+        System.out.print("Geben Sie den Kilometerstand ein: ");
+        int kilometerstand = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie das Baujahr ein: ");
+        int baujahr = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie die Farbe ein: ");
+        String farbe = scanner.nextLine();
+        System.out.print("Geben Sie die Anzahl der Sitze ein: ");
+        int anzahlSitze = Integer.parseInt(scanner.nextLine());
         System.out.print("Geben Sie das Kofferraumvolumen ein: ");
-        int kofferraumvolumen = Integer.parseInt(scanner.nextLine().trim());
+        int kofferraumvolumen = Integer.parseInt(scanner.nextLine());
+
         return new PKW(kilometerstand, baujahr, farbe, anzahlSitze, kofferraumvolumen);
     }
 
-    private static LKW erstelleLkw(Scanner scanner, int kilometerstand, int baujahr, String farbe) {
-        System.out.print("Ladegewicht des LKW in kg: ");
-        float ladegewicht = Float.parseFloat(scanner.nextLine().trim());
+    private static LKW erstelleLKW(Scanner scanner) {
+        System.out.print("Geben Sie den Kilometerstand ein: ");
+        int kilometerstand = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie das Baujahr ein: ");
+        int baujahr = Integer.parseInt(scanner.nextLine());
+        System.out.print("Geben Sie die Farbe ein: ");
+        String farbe = scanner.nextLine();
+        System.out.print("Geben Sie das Ladegewicht ein: ");
+        float ladegewicht = Float.parseFloat(scanner.nextLine());
         System.out.print("Geben Sie die Anzahl der Achsen ein: ");
-        int anzahlAchsen = Integer.parseInt(scanner.nextLine().trim());
+        int anzahlAchsen = Integer.parseInt(scanner.nextLine());
+
         return new LKW(kilometerstand, baujahr, farbe, ladegewicht, anzahlAchsen);
     }
+
+    private static Mitarbeiter getMitarbeiter(Scanner scanner) {
+        System.out.print("Geben Sie den Vornamen des Mitarbeiters ein: ");
+        String vorname = scanner.nextLine();
+        System.out.print("Geben Sie den Nachnamen des Mitarbeiters ein: ");
+        String nachname = scanner.nextLine();
+        System.out.print("Geben Sie das Geburtsdatum des Mitarbeiters ein (YYYY-MM-DD): ");
+        LocalDate geburtsdatum = LocalDate.parse(scanner.nextLine());
+
+        return new Mitarbeiter(vorname, nachname, geburtsdatum);
+    }
+
+    private static void zeigeMitarbeiter(Statement stmt) throws SQLException {
+        System.out.println("--- Alle Mitarbeiter ---");
+        String query = "SELECT * FROM Mitarbeiter"; // Angenommen, die Tabelle heißt "Mitarbeiter"
+        ResultSet rs = stmt.executeQuery(query);
+
+        // Wenn keine Mitarbeiter in der Tabelle sind, eine Nachricht anzeigen
+        if (!rs.isBeforeFirst()) {
+            System.out.println("Keine Mitarbeiter in der Tabelle.");
+            return;
+        }
+
+        while (rs.next()) {
+            int id = rs.getInt("mitarbeiter_id"); // Angenommen, die ID-Spalte heißt "mitarbeiter_id"
+            String vorname = rs.getString("vorname");
+            String nachname = rs.getString("nachname");
+            Date geburtsdatum = rs.getDate("geburtsdatum");
+
+            System.out.println("ID: " + id + ", Vorname: " + vorname + ", Nachname: " + nachname + ", Geburtsdatum: " + geburtsdatum);
+        }
+        System.out.println("-----------------------------");
+    }
+
 }

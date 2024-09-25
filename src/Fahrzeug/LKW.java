@@ -45,15 +45,4 @@ public class LKW extends Fahrzeug {
                 "} " + super.toString();
     }
 
-    @Override
-    public String getInsertSQLBefehl() {
-        return "INSERT INTO fahrzeug (kilometerstand, baujahr, farbe) VALUES (" +
-                getKilometerstand() + ", " + getBaujahr() + ", '" + getFarbe() + "')";
-    }
-
-    @Override
-    public String getSpezifischenInsertSQLBefehl(int fahrzeugID) {
-        return "INSERT INTO lkw (id, ladegewicht, anzahl_achsen) VALUES (" +
-                fahrzeugID + ", " + getLadegewicht() + ", " + getAnzahlAchsen() + ")";
-    }
 }

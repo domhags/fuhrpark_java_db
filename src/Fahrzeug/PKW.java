@@ -5,9 +5,9 @@ public class PKW extends Fahrzeug {
     private int kofferraumvolumen;
 
     // Konstruktor
-    public PKW(int kilometerstand, int baujahr, String farbe, int sitze, int kofferraumvolumen) {
+    public PKW(int kilometerstand, int baujahr, String farbe, int anzahlSitze, int kofferraumvolumen) {
         super(kilometerstand, baujahr, farbe);
-        setSitze(sitze);
+        setSitze(anzahlSitze);
         setKofferraumvolumen(kofferraumvolumen);
     }
 
@@ -43,15 +43,4 @@ public class PKW extends Fahrzeug {
                 ", Sitze=" + getSitze() + ", Kofferraumvolumen=" + getKofferraumvolumen() + "]";
     }
 
-    @Override
-    public String getInsertSQLBefehl() {
-        return "INSERT INTO fahrzeug (kilometerstand, baujahr, farbe) VALUES (" +
-                getKilometerstand() + ", " + getBaujahr() + ", '" + getFarbe() + "')";
-    }
-
-    @Override
-    public String getSpezifischenInsertSQLBefehl(int fahrzeugID) {
-        return "INSERT INTO pkw (id, anzahl_sitze, kofferraumvolumen) VALUES (" +
-                fahrzeugID + ", " + getSitze() + ", " + getKofferraumvolumen() + ")";
-    }
 }

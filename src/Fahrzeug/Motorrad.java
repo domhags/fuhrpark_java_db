@@ -45,15 +45,4 @@ public class Motorrad extends Fahrzeug {
                 "} " + super.toString();
     }
 
-    @Override
-    public String getInsertSQLBefehl() {
-        return "INSERT INTO fahrzeug (kilometerstand, baujahr, farbe) VALUES (" +
-                getKilometerstand() + ", " + getBaujahr() + ", '" + getFarbe() + "')";
-    }
-
-    @Override
-    public String getSpezifischenInsertSQLBefehl(int fahrzeugID) {
-        return "INSERT INTO motorrad (id, hubraum, anzahl_helmhalterungen) VALUES (" +
-                fahrzeugID + ", " + getHubraum() + ", " + getAnzahlHelmhalterungen() + ")";
-    }
 }

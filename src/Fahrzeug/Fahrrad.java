@@ -7,7 +7,7 @@ public class Fahrrad extends Fahrzeug {
     // Konstruktor
     public Fahrrad(int kilometerstand, int baujahr, String farbe, String art, int anzahlGaenge) {
         super(kilometerstand, baujahr, farbe);
-        setArt(art.trim());
+        setArt(art);
         setAnzahlGaenge(anzahlGaenge);
     }
 
@@ -44,15 +44,4 @@ public class Fahrrad extends Fahrzeug {
                 ", Art=" + getArt() + ", Anzahl der Gänge=" + getAnzahlGaenge() + "]";
     }
 
-    @Override
-    public String getInsertSQLBefehl() {
-        return "INSERT INTO fahrzeug (kilometerstand, baujahr, farbe) VALUES (" +
-                getKilometerstand() + ", " + getBaujahr() + ", '" + getFarbe() + "')";
-    }
-
-    @Override
-    public String getSpezifischenInsertSQLBefehl(int fahrzeugID) {
-        return "INSERT INTO fahrrad (id, art, anzahl_gaenge) VALUES (" +
-                fahrzeugID + ", '" + getArt() + "', " + getAnzahlGaenge() + ")";
-    }
 }

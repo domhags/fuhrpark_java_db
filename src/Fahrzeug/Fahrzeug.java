@@ -6,10 +6,10 @@ public abstract class Fahrzeug {
     private String farbe;
 
     // Konstruktor
-    public Fahrzeug(int kilometerstand, int baujahr, String farbe) {
+    protected Fahrzeug(int kilometerstand, int baujahr, String farbe) {
         setKilometerstand(kilometerstand);
         setBaujahr(baujahr);
-        setFarbe(farbe.trim());
+        setFarbe(farbe);
     }
 
     // Getter für Kilometerstand
@@ -56,11 +56,11 @@ public abstract class Fahrzeug {
 
     @Override
     public String toString() {
-        return "Fahrzeug [Kilometerstand=" + getKilometerstand() + ", Baujahr=" + getBaujahr() + ", Farbe=" + getFarbe() + "]";
+        return "Fahrzeug{" +
+                "kilometerstand=" + getKilometerstand() +
+                ", baujahr=" + getBaujahr() +
+                ", farbe='" + getFarbe() + '\'' +
+                '}';
     }
 
-    // Abstrakte Methoden
-    public abstract String getInsertSQLBefehl();
-
-    public abstract String getSpezifischenInsertSQLBefehl(int fahrzeugID);
 }
