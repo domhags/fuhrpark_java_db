@@ -14,10 +14,12 @@ public class Mitarbeiter {
         setGeburtsdatum(geburtsdatum);
     }
 
+    // Getter für Vorname
     public String getVorname() {
         return vorname;
     }
 
+    // Setter für Vorname
     private void setVorname(String vorname) {
         if (vorname == null || vorname.trim().isEmpty()) {
             throw new IllegalArgumentException("Fehler: Der Vorname darf nicht leer sein.");
@@ -25,10 +27,12 @@ public class Mitarbeiter {
         this.vorname = vorname;
     }
 
+    // Getter für Nachname
     public String getNachname() {
         return nachname;
     }
 
+    // Setter für Nachname
     private void setNachname(String nachname) {
         if (nachname == null || nachname.trim().isEmpty()) {
             throw new IllegalArgumentException("Fehler: Der Nachname darf nicht leer sein.");
@@ -36,10 +40,12 @@ public class Mitarbeiter {
         this.nachname = nachname;
     }
 
+    // Getter für das Geburtsdatum
     public LocalDate getGeburtsdatum() {
         return geburtsdatum;
     }
 
+    // Setter für das Geburtsdatum
     public void setGeburtsdatum(LocalDate geburtsdatum) {
         if (geburtsdatum.isAfter(LocalDate.now())) {
             throw new IllegalArgumentException("Fehler: Das Geburtsdatum darf nicht in der Zukunft liegen.");
@@ -54,9 +60,5 @@ public class Mitarbeiter {
                 ", nachname='" + getNachname() + '\'' +
                 ", geburtsdatum=" + getGeburtsdatum() +
                 '}';
-    }
-
-    public String getInsertSQLBefehl() {
-        return "INSERT INTO Mitarbeiter (vorname, nachname, geburtsdatum) VALUES (?, ?, ?)";
     }
 }
